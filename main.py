@@ -53,40 +53,6 @@ class QUESTIONS(Enum):
         ...
         8: Prefer not to answer
     """
-                                                # Question type     Name of field           Value
-    Satisfaction = "Satisfaction"               # 1-5               Questions[0].Responses  value=5
-    # find_by_value("Next")
-    # Are you sure popup find_link_by_text("Yes")
-    OrderPlacement = "Order placement method"   # Order method      Questions[0].Responses  value=1
-    CorrectOrder = "Received correct order"     # Yes|No            Questions[1].Responses  value=1
-    # find_by_value("Next")
-    FoodQuality = "Food quality"                # 1-5               Questions[0].Responses  value=5
-    # find_by_value("Next")
-    FriendlyTeam = "Team friendliness"          # 1-5               Questions[0].Responses  value=5
-    Speed = "Service speed"                     # 1-5               Questions[1].Responses  value=5
-    Cleanliness = "Cleanliness"                 # 1-5               Questions[2].Responses  value=5
-    # find_by_value("Next")
-    Temperature = "Temperature"                 # Temperature       Questions[0].Responses  value=1
-    # find_by_value("Next")
-    MenuVariety = "Menu variety"                # 1-5               Questions[0].Responses  value=5
-    ValueReceived = "Value received"            # 1-5               Questions[1].Responses  value=5
-    # find_by_value("Next")
-    ProblemDuringVisit = "Problem during visit" # Yes|No            Questions[0].Responses  value=2
-    # find_by_value("Next")
-    CompeditorsIn30Days = "Visits to compeditors in last 30 days" # Questions[0].Responses  value=1-6
-    SmashBurgerIn30Days = "Visits to SmashBurger in last 30 days" # Questions[1].Responses  value=4
-    TypeOfVisit = "Type of visit"               #                   Questions[2].Responses  value=3
-    LoyaltyMember = "Loyalty member"            # Yes|No            Questions[3].Responses  value=1
-    # find_by_value("Next")
-    Recommendation = "Recommendation likeliness"# 1-5               Questions[0].Responses  value=5
-    # find_by_value("Next")
-    Compliments = "Compliments"                 # Yes|No            Questions[0].Responses  value=2
-    AnyRecommendations = "Any recommendations"  # Yes|No            Questions[1].Responses  value=1
-    # find_by_value("Next")
-    Recommendations = "Recommendations"         # Open              Questions[0].OpenEndedResponse value="Free WiFi"
-    # find_by_value("Next")
-    Gender = "Gender"                           # Gender            Questions[0].Responses  value=1
-    Age = "Age"                                 # Age               Questions[1].Responses  value=2
 
 
 HEADLESS = False
@@ -167,7 +133,7 @@ def open_browser():
     return browser
 
 
-def do_receipt_info_page(browser, receipt_info):
+def receipt_info_page(browser, receipt_info):
     # Store number: HTML_Name=STORE_NUMBER_NAME Type=text
     store_num = receipt_info[FIELDS.StoreNumber]
     browser.fill(STORE_NUMBER_NAME, store_num)
@@ -229,9 +195,234 @@ def do_receipt_info_page(browser, receipt_info):
     button.click()
 
 
-def do_begin_survey(browser):
+def begin_survey(browser):
     button = browser.find_by_value("Begin Survey")
     button.click()
+
+
+def click_next(browser):
+    next_button = browser.find_by_value('Next')
+    next_button.click()
+
+
+def page_1(browser):
+    """
+    Satisfaction:
+        Name:    Questions[0].Responses
+        Type:    select(1-5) # Horrible-Excellent
+        Answer:  5 # Excellent
+    Next
+    Confirm
+    """
+    
+    browser.select('Questions[0].Responses', '5')
+    click_next(browser)
+    code.interact(local=locals())
+    
+
+def page_2(browser):
+    """
+    Order method:
+        Name:    Questions[0].Responses
+        Type:    select(1...) Order in eat in, ...
+        Answer:  1
+    Received correct order:
+        Name:    Questions[1].Responses
+        Type:    select(1,2) # Yes, No
+        Answer:  1
+    Next
+    """
+    
+    browser.select('Questions[0].Responses', '1')
+    browser.select('Questions[1].Responses', '1')
+    click_next(browser)
+    
+
+def page_3(browser):
+    """
+    Food Quality:
+        Name:    Questions[0].Responses
+        Type:    select(1-5) # Horrible-Excellent
+        Answer:  5
+    Next
+    """
+    
+    browser.select('Questions[0].Responses', '5')
+    click_next(browser)
+    
+    
+def page_4(browser):
+    """
+    Staff friendliness:
+        Name:    Questions[0].Responses
+        Type:    select(1-5) # Horrible-Excellent
+        Answer:  5
+    Speed:
+        Name:    Questions[1].Responses
+        Type:    select(1-5) # Horrible-Excellent
+        Answer:  5
+    Cleanliness:
+        Name:    Questions[2].Responses
+        Type:    select(1-5) # Horrible-Excellent
+        Answer:  5
+    Next
+    """
+    
+    browser.select('Questions[0].Responses', '5')
+    browser.select('Questions[1].Responses', '5')
+    browser.select('Questions[2].Responses', '5')
+    click_next(browser)
+    
+    
+def page_5(browser):
+    """
+    Temperature:
+        Name:    Questions[0].Responses
+        Type:    select(1-3) # Just right, ...
+        Answer:  1
+    Next
+    """
+    
+    browser.select('Questions[0].Responses', '1')
+    click_next(browser)
+    
+    
+def page_6(browser):
+    """
+    Menu variety:
+        Name:    Questions[0].Responses
+        Type:    select(1-5) # Horrible-Excellent
+        Answer:  5
+    Value received:
+        Name:    Questions[1].Responses
+        Type:    select(1-5)
+        Answer:  5
+    Next
+    """
+    
+    browser.select('Questions[0].Responses', '5')
+    browser.select('Questions[1].Responses', '5')
+    click_next(browser)
+
+
+def page_7(browser):
+    """
+    Problem during visit:
+        Name:    Questions[0].Responses
+        Type:    select(1,2) # Yes, No
+        Answer:  2
+    Next
+    """
+    
+    browser.select('Questions[0].Responses', '2')
+    click_next(browser)
+
+
+def page_8(browser):
+    """
+    Visits to compeditors in last 30 days:
+        Name:    Questions[0].Responses
+        Type:    select(1-6)
+        Answer:  
+    Visits to SmahsBurger in last 30 days:
+        Name:    Questions[1].Responses
+        Type:    select(...)
+        Answer:  4
+    Type of visit:
+        Name:    Questions[2].Responses
+        Type:    
+        Answer:  3
+    Loyalty member:
+        Name:    Questions[3].Responses
+        Type:    select(1,2) # Yes, No
+        Answer:  1
+    Next
+    """
+    
+    browser.select('Questions[0].Responses', '1')
+    browser.select('Questions[1].Responses', '4')
+    browser.select('Questions[2].Responses', '3')
+    browser.select('Questions[3].Responses', '1')
+    click_next(browser)
+    
+    
+def page_9(browser):
+    """
+    Recommendation:
+        Name:    Questions[0].Responses
+        Type:    select(1-5) # Never-Always
+        Answer:  5
+    Next
+    """
+    
+    browser.select('Questions[0].Responses', '5')
+    click_next(browser)
+
+
+def page_10(browser):
+    """
+    Any compliments:
+        Name:    Questions[0].Responses
+        Type:    select(1,2) # Yes, No
+        Answer:  2
+    Any recommendations:
+        Name:    Questions[1].Responses
+        Type:    select(1,2) # Yes, No
+        Answer:  1
+    Next
+    """
+    
+    browser.select('Questions[0].Responses', '2')
+    browser.select('Questions[1].Responses', '1')
+    click_next(browser)
+
+
+def page_11(browser):
+    """
+    Recommendations:
+        Name:    Questions[0].OpenEndedResponse
+        Type:    text
+        Answer:  Free WiFi
+    Next
+    """
+    
+    browser.select('Questions[0].OpenEndedResponse', 'Free WiFi')
+    click_next(browser)
+
+
+def page_12(browser):
+    """
+    Gender:
+        Name:    Questions[0].Responses
+        Type:    select(1,2,3) # Male, Female, Not specified
+        Answer:  1
+    Age:
+        Name:    Questions[1].Responses
+        Type:    select(1,2,...) # a<18, 18<=a<24, ...
+        Answer:  2
+    Next
+    """
+    
+    browser.select('Questions[0].Responses', '1')
+    browser.select('Questions[1].Responses', '2')
+    #finish
+
+
+def do_survey(browser):
+    receipt_info_page(browser, receipt_info)
+    begin_survey(browser)
+    page_1(browser)
+    page_2(browser)
+    page_3(browser)
+    page_4(browser)
+    page_5(browser)
+    page_6(browser)
+    page_7(browser)
+    page_8(browser)
+    page_9(browser)
+    page_10(browser)
+    page_11(browser)
+    page_12(browser)
 
 
 def close_browser(browser):
@@ -252,8 +443,7 @@ def main():
     browser = open_browser()
 
     try:
-        do_receipt_info_page(browser, receipt_info)
-        do_begin_survey(browser)
+        do_survey(browser, receipt_info)   
     except Exception as e:
         print(e)
         code.interact(local=locals())
