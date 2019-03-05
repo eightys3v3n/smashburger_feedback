@@ -55,7 +55,7 @@ class QUESTIONS(Enum):
     """
 
 
-HEADLESS = False
+HEADLESS = True
 FEEDBACK_URL = 'https://smashburgerfeedback.survey.marketforce.com'
 DATETIME_FORMAT = '%y%m%d %H%M'
 DEFAULT_RECEIPT_INFO = {
@@ -124,13 +124,95 @@ def prompt_survey_answers():
     ret = {}
 
 
-
-
 def open_browser():
     browser = splinter.Browser("chrome", headless=HEADLESS)
     browser.__enter__()
     browser.visit(FEEDBACK_URL)
     return browser
+
+
+class OpenDateBox:
+    def __init__(self, browser):
+        self.browser = browser
+        self.activator = None
+        self.date_box_element = None
+        self.month_element = None
+
+    def activate(self):
+        self.activator = self.browser.find_link_by_text('Open Date Picker')
+        if len(self.activator) != 1:
+            print("Didn't find only one date box, found {}.".format(len(self.activator)))
+            if len(self.activator) > 1:
+                raise Exception("Found too many date box activation buttons")
+            elif len(self.activator) == 0:
+                raise Exception("Didn't find a date box activation")
+        self.activator = self.activator[0]
+        self.activator.click()
+
+    def find_box(self):
+        self.date_box_element = self.browser.find_by_css('div[class="ui-datebox-container ui-overlay-shadow ui-corner-all pop ui-body-b in"]')
+        assert self.date_box_element is not None, "Found no date box elements."
+        assert len(self.date_box_element) == 1, "Found too many date box elements."
+        self.date_box_element = self.date_box_element[0]
+
+    def find_month(self):
+        self.month_element = self.date_box_element.find_by_tag('h4')
+        assert self.month_element is not None, "Couldn't find date box month header."
+        assert len(self.month_element) == 1, "Found too many date box month headers."
+        self.month_element = self.month_element[0]
+
+    def find_previous_month(self):
+        self.previous_month_element = self.date_box_element.find_by_css('div[class="ui-datebox-gridminus ui-btn ui-btn-a ui-icon-minus ui-btn-icon-notext ui-btn-inline ui-shadow ui-corner-all"]')
+        assert self.previous_month_element is not None, "Couldn't find previous month element."
+        assert len(self.previous_month_element) == 1, "Found too many previous month elements."
+        self.previous_month_element = self.previous_month_element[0]
+
+    def find_day_grid(self):
+        self.day_grid_element = self.date_box_element.find_by_css('div[class="ui-datebox-grid"]')
+        assert self.day_grid_element is not None, "Couldn't find day grid element."
+        assert len(self.day_grid_element) == 1, "Found too many day grid elements."
+        self.day_grid_element = self.day_grid_element[0]
+
+    def find_valid_days(self):
+        valid_days = [
+            *self.day_grid_element.find_by_css('div[class="ui-datebox-griddate ui-corner-all ui-btn-up-a"]'),  # Valid days this month
+            *self.day_grid_element.find_by_css('div[class="ui-datebox-griddate ui-corner-all ui-btn-up-e"]')  # Current day
+        ]
+        return valid_days
+
+    def find_elements(self):
+        self.find_box()
+        self.find_month()
+        self.find_previous_month()
+        self.find_day_grid()
+
+    def get_month(self):
+        month = self.month_element.text
+        month = datetime.strptime(month, "%B %Y")
+        return month
+
+    def previous_month(self):
+        self.previous_month_element.click()
+
+    def select_day(self, desired_day):
+        day_element = None
+        days = self.find_valid_days()
+        for day in days:
+            if day.value == str(desired_day):
+                day_element = day
+                break
+        assert day_element is not None, "Didn't find desired day."
+        day_element.click()
+
+    def select_month(self, month):
+        assert self.get_month().month >= month, "The desired month is in the future?"
+        while self.get_month().month > month:
+            self.previous_month()
+
+    def select_date(self, date):
+        self.find_elements()
+        self.select_month(date.month)
+        self.select_day(date.day)
 
 
 def receipt_info_page(browser, receipt_info):
@@ -141,28 +223,9 @@ def receipt_info_page(browser, receipt_info):
     # Date of visit: HTML_Name=DATE_OF_VISIT_NAME Type=text Format=mm/dd/YYYY
     date_of_visit = receipt_info[FIELDS.VisitDateTime].date()
 
-    if date_of_visit.month == datetime.now().month:
-        date_of_visit = date_of_visit.strftime('%m/%d/%y')
-        date_picker = browser.find_link_by_text("Open Date Picker")
-        assert len(date_picker) == 1, "Invalid date picker stuff found"
-        date_picker = date_picker[0]
-        date_picker.click()
-
-        date_picker_box = browser.find_by_css('div[class="ui-datebox-grid"]')
-        temp = []
-        temp.extend(date_picker_box.find_by_css('div[class="ui-datebox-griddate ui-corner-all ui-btn-up-a"]')) # Valid days this month
-        temp.extend(date_picker_box.find_by_css('div[class="ui-datebox-griddate ui-corner-all ui-btn-up-e"]')) # Current day
-        entered_day = ""
-        for e in temp:
-            if e.value == str(receipt_info[FIELDS.VisitDateTime].day):
-                entered_day = e
-                break
-        else:
-            raise Exception("Didn't find a div for day {}".format(receipt_info[FIELDS.VisitDateTime].day))
-        entered_day.click()
-
-    else:
-        raise NotImplementedError("Months other than the current aren't implemented")
+    date_box = OpenDateBox(browser)
+    date_box.activate()
+    date_box.select_date(date_of_visit)
 
     """
     Time of visit: HTML_Name=TIME_OF_VISIT_NAME Type=select Options=
@@ -190,9 +253,17 @@ def receipt_info_page(browser, receipt_info):
     browser.fill(RECEIPT_NUMBER_NAME, check_num)
 
     button = browser.find_by_css('div[class=startButton]')
+    time_started = time.time()
+    while not button.visible and time.time() - time_started < 20:
+        time.sleep(0.5)
     button.mouse_over()
-    time.sleep(1)
     button.click()
+
+
+def select_ratio(browser, name, value):
+    input_element = browser.find_by_css('input[name="{}"][value="{}"]'.format(name, value))
+    clickable_element = input_element.find_by_xpath('..')
+    clickable_element.click()
 
 
 def begin_survey(browser):
@@ -215,9 +286,10 @@ def page_1(browser):
     Confirm
     """
     
-    browser.select('Questions[0].Responses', '5')
+    select_ratio(browser, 'Questions[0].Responses', '5')
     click_next(browser)
-    code.interact(local=locals())
+    yes_button = browser.find_by_text('Yes')
+    yes_button[1].click() # No idea why there are two yes buttons, but only the second one works.
     
 
 def page_2(browser):
@@ -232,9 +304,9 @@ def page_2(browser):
         Answer:  1
     Next
     """
-    
-    browser.select('Questions[0].Responses', '1')
-    browser.select('Questions[1].Responses', '1')
+
+    select_ratio(browser, 'Questions[0].Responses', '1')
+    select_ratio(browser, 'Questions[1].Responses', '1')
     click_next(browser)
     
 
@@ -247,7 +319,7 @@ def page_3(browser):
     Next
     """
     
-    browser.select('Questions[0].Responses', '5')
+    select_ratio(browser, 'Questions[0].Responses', '5')
     click_next(browser)
     
     
@@ -268,9 +340,9 @@ def page_4(browser):
     Next
     """
     
-    browser.select('Questions[0].Responses', '5')
-    browser.select('Questions[1].Responses', '5')
-    browser.select('Questions[2].Responses', '5')
+    select_ratio(browser, 'Questions[0].Responses', '5')
+    select_ratio(browser, 'Questions[1].Responses', '5')
+    select_ratio(browser, 'Questions[2].Responses', '5')
     click_next(browser)
     
     
@@ -283,7 +355,7 @@ def page_5(browser):
     Next
     """
     
-    browser.select('Questions[0].Responses', '1')
+    select_ratio(browser, 'Questions[0].Responses', '1')
     click_next(browser)
     
     
@@ -300,8 +372,8 @@ def page_6(browser):
     Next
     """
     
-    browser.select('Questions[0].Responses', '5')
-    browser.select('Questions[1].Responses', '5')
+    select_ratio(browser, 'Questions[0].Responses', '5')
+    select_ratio(browser, 'Questions[1].Responses', '5')
     click_next(browser)
 
 
@@ -314,7 +386,7 @@ def page_7(browser):
     Next
     """
     
-    browser.select('Questions[0].Responses', '2')
+    select_ratio(browser, 'Questions[0].Responses', '2')
     click_next(browser)
 
 
@@ -339,10 +411,10 @@ def page_8(browser):
     Next
     """
     
-    browser.select('Questions[0].Responses', '1')
-    browser.select('Questions[1].Responses', '4')
-    browser.select('Questions[2].Responses', '3')
-    browser.select('Questions[3].Responses', '1')
+    select_ratio(browser, 'Questions[0].Responses', '1')
+    select_ratio(browser, 'Questions[1].Responses', '4')
+    select_ratio(browser, 'Questions[2].Responses', '3')
+    select_ratio(browser, 'Questions[3].Responses', '1')
     click_next(browser)
     
     
@@ -355,7 +427,7 @@ def page_9(browser):
     Next
     """
     
-    browser.select('Questions[0].Responses', '5')
+    select_ratio(browser, 'Questions[0].Responses', '5')
     click_next(browser)
 
 
@@ -372,8 +444,8 @@ def page_10(browser):
     Next
     """
     
-    browser.select('Questions[0].Responses', '2')
-    browser.select('Questions[1].Responses', '1')
+    select_ratio(browser, 'Questions[0].Responses', '2')
+    select_ratio(browser, 'Questions[1].Responses', '1')
     click_next(browser)
 
 
@@ -386,7 +458,7 @@ def page_11(browser):
     Next
     """
     
-    browser.select('Questions[0].OpenEndedResponse', 'Free WiFi')
+    browser.fill('Questions[0].OpenEndedResponse', 'Free WiFi')
     click_next(browser)
 
 
@@ -403,12 +475,19 @@ def page_12(browser):
     Next
     """
     
-    browser.select('Questions[0].Responses', '1')
-    browser.select('Questions[1].Responses', '2')
-    #finish
+    select_ratio(browser, 'Questions[0].Responses', '1')
+    select_ratio(browser, 'Questions[1].Responses', '2')
+    click_next(browser)
 
 
-def do_survey(browser):
+def get_number(browser):
+    number = browser.find_by_css('span[style="color: #ff0000;"]')
+    number = number.find_by_tag('span')[0]
+    number = number.text
+    return number
+
+
+def do_survey(browser, receipt_info):
     receipt_info_page(browser, receipt_info)
     begin_survey(browser)
     page_1(browser)
@@ -423,6 +502,8 @@ def do_survey(browser):
     page_10(browser)
     page_11(browser)
     page_12(browser)
+    number = get_number(browser)
+    return number
 
 
 def close_browser(browser):
@@ -430,27 +511,24 @@ def close_browser(browser):
 
 
 def main():
-    receipt_info = {
-        FIELDS.StoreNumber: 1683,
-        FIELDS.VisitDateTime: datetime(2019, 2, 24, 12, 59),
-        FIELDS.ReceiptNumber: 103103
-    }
-    # receipt_info = prompt_receipt_info()
-    # print(receipt_info)
-    survey_answers = prompt_survey()
-    print(survey_answers)
-
+    global browser
+    # receipt_info = {
+    #     FIELDS.StoreNumber: 1683,
+    #     FIELDS.VisitDateTime: datetime(2019, 3, 3, 12, 56),
+    #     FIELDS.ReceiptNumber: 10015
+    # }
+    receipt_info = prompt_receipt_info()
     browser = open_browser()
 
-    try:
-        do_survey(browser, receipt_info)   
-    except Exception as e:
-        print(e)
-        code.interact(local=locals())
+    number = do_survey(browser, receipt_info)
+    print(number)
 
-    input()
     close_browser(browser)
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(e)
+        code.interact(local=locals())
